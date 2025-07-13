@@ -37,7 +37,7 @@ export default function Profile() {
     setProfile({ ...profile, [field]: value });
   };
 
-  const handleLinkChange = (index: number, key: string, value: string) => {
+  const handleLinkChange = (index: number, key: 'label' | 'url', value: string) => {
     const updatedLinks = [...profile.links];
     updatedLinks[index][key] = value;
     setProfile({ ...profile, links: updatedLinks });
