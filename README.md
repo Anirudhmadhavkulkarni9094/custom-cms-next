@@ -1,8 +1,6 @@
 Here's a clean and professional `README.md` for your custom CMS project:
 
 ---
-
-````markdown
 # ✍️ Custom Content Management System
 
 A lightweight, developer-friendly CMS built with **Next.js** and powered by **MongoDB**.  
@@ -106,4 +104,3 @@ MIT — free to use, fork, and customize.
 
 ## 👨‍💻 Built by [Anirudh Kulkarni](https://anirudh-kulkarni.vercel.app)
 
-```
