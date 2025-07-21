@@ -33,8 +33,8 @@ This system is designed to be the content backend for multiple blogging platform
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/yourusername/custom-cms.git
-cd custom-cms
+git clone https://github.com/Anirudhmadhavkulkarni9094/custom-cms-next.git
+cd custom-cms-next
 ````
 
 ### 2. Install dependencies
