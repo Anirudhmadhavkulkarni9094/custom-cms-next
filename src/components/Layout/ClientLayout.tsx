@@ -1,7 +1,12 @@
+"use client"
 import React from 'react'
 import Sidebar from '../Sidebar/Sidebar'
 
 function ClientLayout({children}: {children: React.ReactNode}) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const toggleSidebar = () => {
+    setIsOpen(!isOpen);
+  };
   return (
     <div>
         <div className="flex min-h-screen">
