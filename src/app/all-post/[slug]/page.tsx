@@ -1,8 +1,8 @@
-"use client";
+// src/app/all-post/[slug]/page.tsx
+
 import { supabase } from '@/lib/supabaseClient';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
 
 type Post = {
   id: string;
@@ -25,27 +25,13 @@ async function getPost(slug: string) {
   return { data, error };
 }
 
-export default function PostPreview({ params }: { params: { slug: string } }) {
-  const [post, setPost] = useState<Post | null>(null);
-  const [loading, setLoading] = useState(true);
+export default async function PostPreview( { params }: { params: Promise<{ slug: string }> }
+) {
+    const resolvedParams = await params;
+  const { data: post, error } = await getPost(resolvedParams.slug);
 
-  useEffect(() => {
-    getPost(params.slug).then(({ data, error }) => {
-      if (error || !data) {
-        setPost(null);
-      } else {
-        setPost(data);
-      }
-      setLoading(false);
-    });
-  }, [params.slug]);
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading...</div>;
-  }
-  if (!post) {
+  if (error || !post) {
     notFound();
-    return null;
   }
 
   return (
