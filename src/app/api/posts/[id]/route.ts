@@ -22,6 +22,7 @@ export async function GET(
   return NextResponse.json(data);
 }
 
+
 export async function PUT(
   req: NextRequest,
    { params }: { params: Promise<{ id: string }> }
@@ -40,22 +41,51 @@ export async function PUT(
         title,
         slug,
         content,
-        category,
-        tags,
+        category_id: category?.id ?? null,
         featured_image,
         publish,
       })
       .eq('id', id);
 
     if (error) {
+      console.error('Update error:', error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Handle tags (optional if you have many-to-many logic)
+    if (tags && Array.isArray(tags)) {
+      const { error: deleteError } = await supabase
+        .from('post_tag')
+        .delete()
+        .eq('post_id', id);
+
+      if (deleteError) {
+        console.error('Tag delete error:', deleteError.message);
+        return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      }
+
+      const tagInsert = tags.map((tag: any) => ({
+        post_id: id,
+        tag_id: tag.id,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('post_tag')
+        .insert(tagInsert);
+
+      if (insertError) {
+        console.error('Tag insert error:', insertError.message);
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+    }
+
     return NextResponse.json({ message: 'Post updated successfully' });
-  } catch {
+  } catch (err: any) {
+    console.error('Unexpected error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
 
 export async function DELETE(
   _: NextRequest,
