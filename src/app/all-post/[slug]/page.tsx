@@ -1,0 +1,86 @@
+import { supabase } from '@/lib/supabaseClient';
+import { notFound } from 'next/navigation';
+import Image from 'next/image';
+
+type Post = {
+  id: string;
+  title: string;
+  category: { id: string; label: string };
+  tags: { id: string; label: string }[];
+  featured_image: string;
+  content: string;
+  publish: boolean;
+  slug: string;
+  created_at: string;
+};
+
+export default async function PostPreview({ params }: { params: { slug: string } }) {
+  const { data, error } = await supabase
+    .from('post_full_data') // Use the VIEW here instead of raw 'posts'
+    .select('*')
+    .eq('slug', params.slug)
+    .single<Post>();
+
+  if (error || !data) notFound();
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-10 px-4">
+      <article className="max-w-4xl mx-auto bg-white shadow-xl rounded-3xl overflow-hidden border border-gray-200">
+        {/* Header */}
+        <header className="p-8">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
+            {data.title}
+          </h1>
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <span>{new Date(data.created_at).toLocaleString()}</span>
+            <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium">
+              {data.category?.label}
+            </span>
+          </div>
+        </header>
+
+        {/* Featured Image */}
+        {data.featured_image && (
+          <div className="relative aspect-video w-full">
+            <Image
+              src={data.featured_image}
+              alt={data.title}
+              fill
+              className="object-cover"
+            />
+          </div>
+        )}
+
+        {/* Content */}
+        <section className="prose prose-lg max-w-none px-8 py-10 text-gray-800">
+          <div dangerouslySetInnerHTML={{ __html: data.content }} />
+        </section>
+
+        {/* Tags */}
+        <footer className="px-8 pb-10 border-t border-gray-100">
+          {data.tags?.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm text-gray-600 font-semibold mb-2">Tags:</h3>
+              <div className="flex flex-wrap gap-2">
+                {data.tags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-medium hover:bg-gray-300 transition"
+                  >
+                    #{tag.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!data.publish && (
+            <div className="mt-6 text-sm font-semibold text-yellow-800 bg-yellow-100 px-4 py-2 rounded-md border border-yellow-300">
+              This post is in <strong>draft</strong> mode and not publicly visible.
+            </div>
+          )}
+        </footer>
+      </article>
+    </div>
+  );
+}
