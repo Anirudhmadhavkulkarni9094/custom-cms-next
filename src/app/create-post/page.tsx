@@ -1,70 +1,77 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import WordPressEditor from "./WordPressEditor";
 import Select from "react-select";
 import { supabase } from "@/lib/supabaseClient";
 import slugify from "slugify";
-// Static category and tag data
-const availableCategories = [
-  {
-    _id: "cat1",
-    label: "Technology",
-    value: "technology",
-    description: "All things tech",
-    category_slug: "technology",
-  },
-  {
-    _id: "cat2",
-    label: "Lifestyle",
-    value: "lifestyle",
-    description: "Daily habits and routines",
-    category_slug: "lifestyle",
-  },
-  {
-    _id: "cat3",
-    label: "Health",
-    value: "health",
-    description: "Wellness and fitness",
-    category_slug: "health",
-  },
-  {
-    _id: "cat4",
-    label: "Travel",
-    value: "travel",
-    description: "Travel tips and guides",
-    category_slug: "travel",
-  },
-];
 
-const availableTags = [
-  { _id: "1", label: "React", value: "react" },
-  { _id: "2", label: "Next.js", value: "nextjs" },
-  { _id: "3", label: "TypeScript", value: "typescript" },
-];
+type Category = {
+  id: string;
+  label: string;
+  value: string;
+  description: string;
+  category_slug: string;
+};
+
+type Tag = {
+  id: string;
+  label: string;
+  value: string;
+};
 
 function CreatePostPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState<
-    typeof availableCategories[0] | null
-  >(null);
-  const [selectedTags, setSelectedTags] = useState<
-    { label: string; value: string }[]
-  >([]);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedTags, setSelectedTags] = useState<any[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [image, setImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // 🔽 Fetch categories and tags on load
+  useEffect(() => {
+    const fetchData = async () => {
+      const [catRes, tagRes] = await Promise.all([
+        fetch("/api/posts/category"),
+        fetch("/api/posts/tag"),
+      ]);
+
+      const categoryData = await catRes.json();
+      const tagData = await tagRes.json();
+console.log("Category data:", categoryData);
+      console.log("Tag data:", tagData);
+      setCategories(
+        categoryData.data.map((cat: any) => ({
+          id: cat.id,
+          label: cat.label,
+          value: cat.value,
+          description: cat.description,
+          category_slug: cat.category_slug,
+        }))
+      );
+
+      setTags(
+        tagData.data.map((tag: any) => ({
+          id: tag.id,
+          label: tag.label,
+          value: tag.value,
+        }))
+      );
+    };
+
+    fetchData();
+  }, []);
+
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = availableCategories.find(
-      (c) => c.value === e.target.value
-    );
+    const selected = categories.find((c) => c.value === e.target.value);
     setCategory(selected || null);
   };
 
   const uploadImage = async (file: File) => {
     const fileName = `${Date.now()}-${file.name}`;
     const { data, error } = await supabase.storage
-      .from("post-images") // Make sure this bucket exists!
+      .from("post-images")
       .upload(fileName, file);
 
     if (error) {
@@ -79,53 +86,75 @@ function CreatePostPage() {
     return publicUrlData?.publicUrl || null;
   };
 
-
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setLoading(true);
 
-  let imageUrl = null;
+  try {
+    let imageUrl = null;
 
-  if (image) {
-    imageUrl = await uploadImage(image);
-    if (!imageUrl) {
-      alert("Image upload failed");
+    // Upload image if selected
+    if (image) {
+      imageUrl = await uploadImage(image);
+      if (!imageUrl) {
+        alert("Image upload failed");
+        setLoading(false);
+        return;
+      }
+    }
+
+    const slug = slugify(title, { lower: true, strict: true, trim: true });
+
+    // Step 1: Insert into `posts` table
+    const { data: postData, error: postError } = await supabase.from("posts").insert([
+      {
+        title,
+        slug,
+        content,
+        featured_image: imageUrl,
+        publish: true, // or use a publish state
+        category_id: category?.id,
+      },
+    ]).select(); // select() to return inserted row(s)
+
+    if (postError || !postData || postData.length === 0) {
+      console.error("Insert error:", postError?.message);
+      alert("Failed to publish post");
       setLoading(false);
       return;
     }
-  }
 
-  const slug = slugify(title, {
-    lower: true,
-    strict: true, // removes special characters
-    trim: true,
-  });
+    const postId = postData[0].id;
 
-  const { error } = await supabase.from("posts").insert([
-    {
-      title,
-      slug,
-      content,
-      category: category?.value,
-      tags: selectedTags.map((tag) => tag.value),
-      featured_image: imageUrl,
-    },
-  ]);
+    // Step 2: Insert into `post_tags` join table
+    const tagInserts = selectedTags.map((tag) => ({
+      post_id: postId,
+      tag_id: tag.id,
+    }));
 
-  if (error) {
-    console.error("Insert error:", error.message);
-    alert("Failed to publish post");
-  } else {
+    if (tagInserts.length > 0) {
+      const { error: tagError } = await supabase.from("post_tag").insert(tagInserts);
+      if (tagError) {
+        console.error("Tag insert error:", tagError.message);
+        alert("Post saved but failed to attach tags");
+      }
+    }
+
+    // ✅ Success
     alert("Blog post created!");
     setTitle("");
     setContent("");
-    setImage(null);
     setCategory(null);
     setSelectedTags([]);
+    setImage(null);
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    alert("Something went wrong");
   }
 
   setLoading(false);
 };
+
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -165,8 +194,8 @@ const handleSubmit = async (e: React.FormEvent) => {
               <option disabled value="">
                 Select Category
               </option>
-              {availableCategories.map((cat) => (
-                <option key={cat._id} value={cat.value}>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.value}>
                   {cat.label}
                 </option>
               ))}
@@ -181,7 +210,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <Select
               isMulti
               name="tags"
-              options={availableTags}
+              options={tags}
               value={selectedTags}
               onChange={(selected) =>
                 setSelectedTags(
